@@ -7,6 +7,8 @@
   "license": "MIT",
   "private": true,
   "scripts": {
+    "start": "scripts/fzf-md | xargs -I _ reveal-md _",
+    "develop": "scripts/fzf-md | xargs -I _ reveal-md -w _",
     "pre-commit": "lint-staged"
   },
   "devDependencies": {
@@ -23,6 +25,11 @@
     ]
   },
   "lint-staged": {
-    "*.md": ["prettier --write", "remark", "git add"]
-  }
+    "*.md": [
+      "prettier --write",
+      "remark",
+      "git add"
+    ]
+  },
+  "dependencies": {}
 }
