@@ -38,7 +38,7 @@
 
 * Rerender all components?
 * Levenshtein distance?
-* You can use UUID v1. 
+* You can use UUID v1.
 
 ---
 
@@ -87,7 +87,7 @@
 
 ### How to dispatch actions on action?
 
-* Create middleware or use "redux-thunk"? 
+* Create middleware or use "redux-thunk"?
 * Is it neccessary to be dispatchable?
 
 ---
