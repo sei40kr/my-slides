@@ -23,7 +23,9 @@
 
 ### 内部ステート
 
-#### コンポーネントの生死がステートの生死
+---
+
+#### 内部ステート
 
 コンポーネントに紐付けるステート。コンポーネントのライフサイクルやイベントの発火に応じて変更する。
 
@@ -34,6 +36,8 @@ this.setState({
 ```
 
 ---
+
+#### State reference
 
 * コンポーネントの外側から参照できない。親から参照したければ、そのステートは子にもたせずに、親がもって子に伝搬する。
 
@@ -54,6 +58,10 @@ onSubmit() {
   sendInputData(this.state.value)
 }
 ```
+
+---
+
+#### コンポーネントの生死がステートの生死
 
 ---
 
@@ -175,27 +183,71 @@ this.props.items.forEach(item => <ChildView key={item.id} {...item} />)
 
 ---
 
-### "className" prop
-
-* Use COMPONENT_ID as a prefix to avoid confliction.
-* Use "classNames()" to accept classnames as a component prop.
+### Dispatch an action with a form value
 
 ---
 
-### How to do something with form values?
+#### redux-thunk is one solution
 
-* Dispatch an action from input event and update Redux state.
+```javascript
+const loginAction = () => (dispatch, getState) => {
+  const { userName, password } = getState().application.loginForm;
+};
+```
 
 ---
 
-### How to bind event?
+#### "mergeProps" seems better
+
+Simpler and more testable.
+
+```javascript
+const mapStateToProps = (state) => ({
+  userName: state.application.loginForm.userName,
+  password: state.application.loginForm.password,
+});
+
+const dispatchProps = (dispatch) => bindActionCreators({
+  onClickLoginButton: loginAction,
+})
+
+const mergeProps = (stateProps, dispatchProps, ownProps) => ({
+  onClickLoginButton: dispatchProps.onClickLoginButton(stateProps.userName, stateProps.password),
+});
+```
 
 ---
 
-### Whose action is it?
+### Bind event with component context
 
-* Which component fires?
-* Which component to know?
+---
+
+```jsx
+// Don't
+<button onClick={(e) => this.props.onClickButton(this.state.inputValue)}>
+  Click me!
+</button>
+```
+
+---
+
+```jsx
+constructor() {
+  this.onClickButton = this.props.onClickButton.bind(this);
+}
+
+onClickButton() {
+  this.props.onClickButton(this.state.inputValue)
+}
+
+render() {
+  return (
+    <button onClick={this.onClickButton}>
+      Click me!
+    </button>
+  );
+}
+```
 
 ---
 
@@ -203,25 +255,16 @@ this.props.items.forEach(item => <ChildView key={item.id} {...item} />)
 
 ---
 
-### "getState" or "mergeProps"?
-
-* "getState" seems simpler, but how to test it?
-* The winner is "mergeProps".
-
----
-
 ### Asynchronous processing
 
-* Use action-dispatcher.
-
 ---
 
-### 複数のアクションを Dispatch する
+#### Dispatch after the processing
 
-
-
-* Create middleware or use "redux-thunk"?
-* Is it neccessary to be dispatchable?
+```javascript
+const fetch = (dispatch) => fetch('/path/to/remote')
+    .then((response) => dispatch(fetchSuccess(response)));
+```
 
 ---
 
@@ -230,16 +273,16 @@ this.props.items.forEach(item => <ChildView key={item.id} {...item} />)
 #### Action Creator をテストするのは簡単
 
 ```javascript
-const hogeAction = (p) => ({
-  type: 'HOGE_ACTION',
-  payload: 'fuga',
+const fetchAction = (targetDate) => ({
+  type: 'FETCH_ACTION',
+  payload: targetDate,
 });
 ```
 
 ```javascript
-expect(hogeAction('fuga')).toBe({
-  type: 'HOGE_ACTION',
-  payload: 'fuga',
+expect(fetchAction('2017-03-27')).toBe({
+  type: 'FETCH_ACTION',
+  payload: '2017-03-27',
 });
 ```
 
@@ -248,9 +291,10 @@ expect(hogeAction('fuga')).toBe({
 #### Action Dispatcher はどうテストする?
 
 ```javascript
-const hogeActionDispatcher = (p1, p2) => (dispatch) => {
-  dispatch(hogeAction(p1));
-  dispatch(hogehogeAction(p2));
+const hogeActionDispatcher = (targetDate) => (dispatch) => {
+  dispatch(showLoadingSpinnerAction());
+  dispatch(fetchAction(targetDate));
+  dispatch(hideLoadingSpinnerAction());
 };
 ```
 
@@ -269,31 +313,118 @@ const spyDispatch = (o) => {
   }
 };
 
-expect(hogeActionDispatcher(spyDispatch)('fuga', 'fugafuga')).toBe([{
-  type: 'HOGE_ACTION',
-  payload: 'fuga',
+expect(hogeActionDispatcher(spyDispatch)('2017-03-27')).toBe([{
+  type: 'SHOW_LOADING_SPINNER_ACTION',
 }, {
-  type: 'HOGEHOGE_ACTION',
-  payload: 'fugafuga',
+  type: 'FETCH_ACTION',
+  payload: '2017-03-27',
+}, {
+  type: 'HIDE_LOADING_SPINNER_ACTION',
 }]);
 ```
 
 ---
 
-### State structure and file/directory structure
+### Domain or view?
 
 ---
 
-### Which is it related, domain or page?
+#### Domain module
+
+* Referred from multiple views.
+* e.g. Attendance
 
 ---
 
-### Normalize the state
+#### View modules
+
+* Referred from single views.
+* e.g. Timesheet
 
 ---
 
-* Normalize a list by record IDs.
-* Memoize using "reselect".
+### Ideal directory structure
+
+---
+
+```text
+- project/
+  - domain/
+    - attendance/
+      - modules/
+  - application/
+    - common/
+      - components/
+        - button.js
+      - modules/
+        - user-setting.js
+    - timesheet-for-pc/
+      - components/
+      - modules/
+        - daily-record.js
+        - pending-request.js
+```
+
+---
+
+### Normalize state
+
+---
+
+#### How to select a list item?
+
+---
+
+#### Un-normalized state
+
+```jsx
+// No
+const getListItem = (state, index) => ({
+  return state.entities[index];
+}); 
+```
+
+---
+
+#### Normalize state
+
+```jsx
+// Yes
+const getListItem = (state, id) => {
+  return state.entity.byId[id];
+}; 
+```
+
+---
+
+#### Implement a converter
+
+```jsx
+const convertEntities = (entities) => ({
+  allIds: entities.map(entity => entity.id),
+  byId: Object.assign({}, entities.map(entity => ({ [entity.id]: entity }))),
+});
+```
+
+---
+
+#### Use reselect to memoize
+
+```jsx
+import { createSelector } from 'reselect';
+
+const entitiesSelector = createSelector(
+  state => state.entity.allIds,
+  state => state.entity.byId,
+  (allIds, byId) => allIds.map(id => byId[id])
+)
+```
+
+```jsx
+const mapStateToProps = (state) => ({
+  entities: entitiesSelector(state),
+});
+```
 
 ---
 
@@ -316,14 +447,75 @@ expect(hogeActionDispatcher(spyDispatch)('fuga', 'fugafuga')).toBe([{
 
 ---
 
-### Why type checking is needed for React development?
+### How to add type annotations for React + Redux?
 
 ---
 
-### How to add type annotations for React + Redux?
+#### Define types of a component event
 
-* How to define types of a component event?
-* How to cast nullable to non-null type?
-* Use an union type to merge parent props and child props.
-* Prohibit reassignments of the state using type definition.
-* Cast the type of an action in reducer to payload.
+---
+
+##### In child component
+
+```jsx
+export type Props = {
+  childProp: string,
+};
+
+export default class ChildComponent extends React.Component<Props> {
+}
+```
+
+---
+
+##### In parent component
+
+Use union type to merge type definitions.
+
+```jsx
+export type Props = ChildProps & {
+  parentProp: string,
+};
+
+export default class ParentComponent extends React.Component<Props> {
+}
+```
+
+---
+
+#### Define the type of action
+
+```javascript
+type FetchAction = {
+  type: 'FETCH_ACTION',
+};
+
+type FetchSuccessAction = {
+  type: 'FETCH_SUCCESS_ACTION',
+  payload: {
+    allIds: string[],
+    byId: { [string]: Entity },
+  }
+};
+
+export type Action = FetchAction | FetchSuccessAction;
+```
+
+---
+
+### Define the type of reducer
+
+```javascript
+const reducer = (state = initialState, action: Action) => {
+  switch (action.type) {
+    case 'FETCH_SUCCESS_ACTION':
+      return {
+        ...state,
+        entity: (action:FetchSuccessAction).payload,
+      };
+
+    default:
+      return state;
+  }
+}
+```
