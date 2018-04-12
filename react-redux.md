@@ -1,44 +1,177 @@
-# React + Redux
+# React + Redux で開発がしたかった
 
 ---
 
-## About me
+## 自己紹介
 
-* A little self introduction.
-
----
-
-## Why I love React
-
-### Not a framework, but a library
-
-* No syntax sugar of its own.
-* You can use the modules you like!
+* よんじゅ。
+* Twitter [@sei40kr](https://twitter.com/sei40kr) にはしょうもないことしか書きません。
 
 ---
 
-## Difference between local state, store, and global state
+## なぜ React なのか
 
-* How is lifecycle of each?
-
----
-
-## Traps in React
+* フレームワークではなく、ライブラリ。
+* 独自の構文をもたない。
+* ライブラリなので、その他のライブラリと親和性が高い。
 
 ---
 
-### Special attributes
+## 内部ステート vs 外部ステート
 
-* Props are not HTML attributes!
-* For instances, "className" and "htmlFor" because they're reserved words in JavaScript.
+---
+
+### 内部ステート
+
+#### コンポーネントの生死がステートの生死
+
+コンポーネントに紐付けるステート。コンポーネントのライフサイクルやイベントの発火に応じて変更する。
+
+```jsx
+this.setState({
+  hoge: 'fuga',
+});
+```
+
+---
+
+* コンポーネントの外側から参照できない。親から参照したければ、そのステートは子にもたせずに、親がもって子に伝搬する。
+
+```jsx
+render() {
+  <form onSubmit={this.onSubmit()}>
+    <CustomInput id="..." value={this.state.value} onChange={this.props.onInputChange()} />
+  </form>
+}
+
+onInputChange(event) {
+  this.setState({
+    value: event.target.value,
+  });
+}
+
+onSubmit() {
+  sendInputData(this.state.value)
+}
+```
+
+---
+
+### 外部ステート
+
+---
+
+#### ステートによってコンポーネントの生死を決める
+
+---
+
+* コンポーネントが消えてもステートは残る。内部ステートに慣れてしまうと事故が起こりやすい。
+* ダイアログを開くと前回の入力内容がクリアされていない、など。
+
+---
+
+#### Redux
+
+* Redux は簡単に言うと、この外部ステートを結合して単一のグローバルステートにしてしまうもの。
+
+---
+
+## React の罠
+
+---
+
+### Prop について
+
+* Prop はタグの属性とは少し違う。DOM オブジェクトのプロパティ。
+* でも基本的にタグの属性と認識していいレベル。
+* 例えば、 `class` と `for` は言語の予約語なのでプロパティとして存在しない。`className` と `htmlFor` を使う。
+
+```jsx
+<div className="">
+  <label htmlFor="" />
+</div>
+```
 
 ---
 
 ### "key" prop
 
-* Rerender all components?
-* Levenshtein distance?
-* You can use UUID v1.
+```jsx
+<ListView items={[1, 3, 4, 5]} />
+```
+
+```jsx
+this.props.items.forEach(item => <ChildView {...item} />)
+```
+
+```html
+<div className="child-view">This is 1st item</div>
+<div className="child-view">This is 3rd item</div>
+<div className="child-view">This is 4th item</div>
+<div className="child-view">This is 5th item</div>
+```
+
+---
+
+#### 要素が増えたらどうする?
+
+---
+
+#### 末尾に追加したケース
+
+```jsx
+// 6 を追加
+<ListView items={[1, 3, 4, 5, 6]} />
+```
+
+```html
+<div className="child-view">This is 1st item</div>
+<div className="child-view">This is 3rd item</div>
+<div className="child-view">This is 4th item</div>
+<div className="child-view">This is 5th item</div>
+<!-- この DOM を追加すれば良い -->
+<div className="child-view">This is 6th item</div>
+```
+
+---
+
+#### 末尾以外に追加したケース
+
+```jsx
+// 2 を追加
+<ListView items={[1, 2, 3, 4, 5]} />
+```
+
+```html
+<div className="child-view">This is 1st item</div>
+<!-- ここから DOM の書き換え開始/表示するアイテムを1つずつズラす -->
+<div className="child-view">This is 2st item</div>
+<div className="child-view">This is 3rd item</div>
+<div className="child-view">This is 4th item</div>
+<!-- この DOM は追加されたもの -->
+<div className="child-view">This is 5th item</div>
+```
+
+---
+
+#### 無駄な DOM の変更が発生
+
+---
+
+#### 繰り返し表示するコンポーネントには `key` Prop を付与
+
+```jsx
+this.props.items.forEach(item => <ChildView key={item.id} {...item} />)
+```
+
+```html
+<div className="child-view">This is 1st item</div>
+<!-- この DOM は追加されたもの -->
+<div className="child-view">This is 2st item</div>
+<div className="child-view">This is 3rd item</div>
+<div className="child-view">This is 4th item</div>
+<div className="child-view">This is 5th item</div>
+```
 
 ---
 
@@ -55,9 +188,7 @@
 
 ---
 
-### "display: none" vs "null"
-
-* "autoFocus" prop.
+### How to bind event?
 
 ---
 
@@ -68,7 +199,7 @@
 
 ---
 
-## Traps in Redux
+## Redux の罠
 
 ---
 
@@ -85,16 +216,67 @@
 
 ---
 
-### How to dispatch actions on action?
+### 複数のアクションを Dispatch する
+
+
 
 * Create middleware or use "redux-thunk"?
 * Is it neccessary to be dispatchable?
 
 ---
 
-### How to test action-dispatchers?
+### Action Dispatcher の単体テスト
 
-* Let's create a spy dispatcher to test. It's very easy!
+#### Action Creator をテストするのは簡単
+
+```javascript
+const hogeAction = (p) => ({
+  type: 'HOGE_ACTION',
+  payload: 'fuga',
+});
+```
+
+```javascript
+expect(hogeAction('fuga')).toBe({
+  type: 'HOGE_ACTION',
+  payload: 'fuga',
+});
+```
+
+---
+
+#### Action Dispatcher はどうテストする?
+
+```javascript
+const hogeActionDispatcher = (p1, p2) => (dispatch) => {
+  dispatch(hogeAction(p1));
+  dispatch(hogehogeAction(p2));
+};
+```
+
+---
+
+#### スパイ Dispatcher を作りましょう。
+
+```javascript
+const spyDispatchLog = [];
+
+const spyDispatch = (o) => {
+  if (typeof o === 'function') {
+    o(spyDispatch);
+  } else {
+    spyDispatchLog.push(o);
+  }
+};
+
+expect(hogeActionDispatcher(spyDispatch)('fuga', 'fugafuga')).toBe([{
+  type: 'HOGE_ACTION',
+  payload: 'fuga',
+}, {
+  type: 'HOGEHOGE_ACTION',
+  payload: 'fugafuga',
+}]);
+```
 
 ---
 
@@ -108,26 +290,29 @@
 
 ### Normalize the state
 
+---
+
 * Normalize a list by record IDs.
 * Memoize using "reselect".
 
 ---
 
-## Type checking
+## 型チェック
 
 ---
 
 ### Typescript
 
-* There're good language tools!
-* There're also many type definitions!
+* 公式の Language Server が充実。
+* NPM レポジトリにモジュールの型定義ファイルも充実。
 
 ---
 
 ### Flow
 
-* Easy to install. Easy to uninstall.
-* You can still use ESLint.
+* オプトイン設計。プロジェクトに簡単に導入でき、簡単に捨てられる。
+* ファイル単位での導入が可能。
+* ESLint も使える。
 
 ---
 
