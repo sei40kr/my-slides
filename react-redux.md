@@ -545,6 +545,13 @@ const fetchDetailsOnSelectItemMiddleware = ({ dispatch }) => (next) => (action) 
 
 ---
 
+### 判断基準
+
+* 新規プロジェクトから導入するならば TypeScript
+* ある程度進行したプロジェクトに導入するなら Flow
+
+---
+
 ### React + Redux で型をどう使う?
 
 ---
