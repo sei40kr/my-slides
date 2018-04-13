@@ -233,7 +233,7 @@ const mergeProps = (stateProps, dispatchProps, ownProps) => ({
 
 ```jsx
 constructor() {
-  this.onClickButton = this.props.onClickButton.bind(this);
+  this.onClickButton = this.onClickButton.bind(this);
 }
 
 onClickButton() {
@@ -313,7 +313,7 @@ const spyDispatch = (o) => {
   }
 };
 
-expect(hogeActionDispatcher(spyDispatch)('2017-03-27')).toBe([{
+expect(hogeActionDispatcher('2017-03-27')(spyDispatch)).toBe([{
   type: 'SHOW_LOADING_SPINNER_ACTION',
 }, {
   type: 'FETCH_ACTION',
