@@ -498,7 +498,7 @@ const mapStateToProps = (state) => ({
 
 ```jsx
 const selectItemAndFetchDetailsDispatcher = (targetId) => (dispatch) => {
-  dispatch(selectItem());
+  dispatch(selectItem(targetId));
   dispatch(fetchDetailsDispatcher());
 };
 ```
@@ -512,7 +512,7 @@ const fetchDetailsOnSelectItemMiddleware = ({ dispatch }) => (next) => (action) 
   next(action);
 
   if (action.type === 'SELECT_ITEM') {
-    dispatch(fetchDetailsDispatcher());
+    dispatch(fetchDetailsDispatcher(action.payload.targetId));
   }
 };
 
