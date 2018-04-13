@@ -9,6 +9,12 @@
 
 ---
 
+### 今回のスライド
+
+https://github.com/sei40kr/my-slides
+
+---
+
 ## なぜ React なのか
 
 * フレームワークではなく、ライブラリ。
@@ -37,7 +43,7 @@ this.setState({
 
 ---
 
-#### State reference
+#### ステートの参照
 
 * コンポーネントの外側から参照できない。親から参照したければ、そのステートは子にもたせずに、親がもって子に伝搬する。
 
@@ -58,6 +64,10 @@ onSubmit() {
   sendInputData(this.state.value)
 }
 ```
+
+---
+
+##### Props を伝搬するだけの簡単なお仕事です
 
 ---
 
@@ -183,11 +193,11 @@ this.props.items.forEach(item => <ChildView key={item.id} {...item} />)
 
 ---
 
-### Dispatch an action with a form value
+### フォームの値をアクションに埋め込む
 
 ---
 
-#### redux-thunk is one solution
+#### redux-thunk という選択肢
 
 ```javascript
 const loginAction = () => (dispatch, getState) => {
@@ -197,9 +207,9 @@ const loginAction = () => (dispatch, getState) => {
 
 ---
 
-#### "mergeProps" seems better
+#### `mergeProps` という選択肢
 
-Simpler and more testable.
+シンプルでテストしやすい。
 
 ```javascript
 const mapStateToProps = (state) => ({
@@ -212,13 +222,16 @@ const dispatchProps = (dispatch) => bindActionCreators({
 })
 
 const mergeProps = (stateProps, dispatchProps, ownProps) => ({
+  ...stateProps,
+  ...dispatchProps,
+  ...ownProps,
   onClickLoginButton: dispatchProps.onClickLoginButton(stateProps.userName, stateProps.password),
 });
 ```
 
 ---
 
-### Bind event with component context
+### ステートを扱うイベントを定義
 
 ---
 
@@ -255,11 +268,11 @@ render() {
 
 ---
 
-### Asynchronous processing
+### 非同期処理
 
 ---
 
-#### Dispatch after the processing
+#### 処理が終わった後にディスパッチする
 
 ```javascript
 const fetch = (dispatch) => fetch('/path/to/remote')
@@ -300,7 +313,7 @@ const hogeActionDispatcher = (targetDate) => (dispatch) => {
 
 ---
 
-#### スパイ Dispatcher を作りましょう。
+#### スパイ Dispatcher を作りましょう
 
 ```javascript
 const spyDispatchLog = [];
@@ -325,25 +338,48 @@ expect(hogeActionDispatcher('2017-03-27')(spyDispatch)).toBe([{
 
 ---
 
-### Domain or view?
+### ビュー or ドメイン
 
 ---
 
-#### Domain module
-
-* Referred from multiple views.
-* e.g. Attendance
+#### コンポーネントやモジュールにどのような階層をもたせる?
 
 ---
 
-#### View modules
+#### 労務管理アプリの例
 
-* Referred from single views.
-* e.g. Timesheet
+* 勤怠 (Attendance) -> ドメインの関心事
+* 勤務表 (Timesheet) -> ビューの関心事
 
 ---
 
-### Ideal directory structure
+#### ビュー or ドメイン
+
+* 打刻ウィジェット -> 勤怠 (ドメイン) の関心事
+* 勤務表のヘッダー -> 勤務表 (ビュー) の関心事
+
+---
+
+#### ビューに紐づくコンポーネント/モジュール
+
+* 1つのビューから参照される
+
+---
+
+#### ドメインに紐づくコンポーネント/モジュール
+
+* 複数のビューから参照される
+
+---
+
+#### 真の汎用コンポーネント/モジュール
+
+* 複数の画面で使うコンポーネントではない。
+* 製品のコアドメインに関係のないコンポーネント。 (Button, Icon, user-setting)
+
+---
+
+### 理想のディレクトリ構造
 
 ---
 
@@ -367,15 +403,18 @@ expect(hogeActionDispatcher('2017-03-27')(spyDispatch)).toBe([{
 
 ---
 
-### Normalize state
+### ステートの正規化
 
 ---
 
-#### How to select a list item?
+#### ステートにあるリストアイテムの選択
 
 ---
 
-#### Un-normalized state
+#### 非正規ステート
+
+* 配列の添字番号で取得。
+* ディスパッチした時点と実行時で添字が変わっていないか...?
 
 ```jsx
 // No
@@ -386,7 +425,11 @@ const getListItem = (state, index) => ({
 
 ---
 
-#### Normalize state
+#### 正規ステート
+
+* アイテム固有のIDで取得。
+* 実行タイミングに疑心暗鬼にならなくてよい。
+* アイテム間に参照関係をもたせるのに便利!
 
 ```jsx
 // Yes
@@ -397,7 +440,19 @@ const getListItem = (state, id) => {
 
 ---
 
-#### Implement a converter
+#### バックエンドには DB のIDを返してもらう
+
+* 分散KVSなどでは UUIDv4 を返す。
+* シーケンスで管理しているRDBならシーケンス番号を返す。
+* ステートの正規化ができて、コンポーネントの `key` にも使える!
+
+---
+
+#### 配列を正規化しよう
+
+* 僕はアクションの作成前にやっています。
+* Reducer で複雑なステートの更新をやる際に早速役に立つ。
+* 以下、滑らない配列の正規化の実装。
 
 ```jsx
 const convertEntities = (entities) => ({
@@ -408,7 +463,11 @@ const convertEntities = (entities) => ({
 
 ---
 
-#### Use reselect to memoize
+#### メモ化しつつ非正規化する
+
+* ビューで扱う際には非正規に戻しておく。
+* `reselect` を使うことによって、必要時だけキャッシュを更新する非正規化関数を作れる。
+* 以下、滑らない正規ステートの非正規化。
 
 ```jsx
 import { createSelector } from 'reselect';
@@ -426,6 +485,44 @@ const mapStateToProps = (state) => ({
 });
 ```
 
+### アクションが Reduce されたときに別のアクションを Dispatch したい
+
+#### 例
+
+リストでアイテムを選択した時に詳細を表示したい。 (詳細を取得するAPIにリクエストしたい)
+
+#### 諦めるという選択肢
+
+* 依存性のあるアクションをまとめる。
+* よっぽどのことがない限りこちらを推奨。
+
+```jsx
+const selectItemAndFetchDetailsDispatcher = (targetId) => (dispatch) => {
+  dispatch(selectItem());
+  dispatch(fetchDetailsDispatcher());
+};
+```
+
+#### 自作ミドルウェアという選択肢
+
+* よっぽどのことがあれば。
+
+```jsx
+const fetchDetailsOnSelectItemMiddleware = ({ dispatch }) => (next) => (action) => {
+  next(action);
+
+  if (action.type === 'SELECT_ITEM') {
+    dispatch(fetchDetailsDispatcher());
+  }
+};
+
+```
+
+### その他
+
+* ステートの再代入。
+* コンテナーの更新条件。
+
 ---
 
 ## 型チェック
@@ -434,7 +531,7 @@ const mapStateToProps = (state) => ({
 
 ### Typescript
 
-* 公式の Language Server が充実。
+* 公式の言語サーバーが充実。
 * NPM レポジトリにモジュールの型定義ファイルも充実。
 
 ---
@@ -444,18 +541,22 @@ const mapStateToProps = (state) => ({
 * オプトイン設計。プロジェクトに簡単に導入でき、簡単に捨てられる。
 * ファイル単位での導入が可能。
 * ESLint も使える。
+* 大規模プロジェクトをスキャンすると非力なノートPCが暖房器具に。
 
 ---
 
-### How to add type annotations for React + Redux?
+### React + Redux で型をどう使う?
 
 ---
 
-#### Define types of a component event
+#### Props の型定義
 
 ---
 
-##### In child component
+##### 子コンポーネント
+
+* ジェネリクスを使って `propTypes` を定義。
+* `export` しておこう。
 
 ```jsx
 export type Props = {
@@ -468,9 +569,9 @@ export default class ChildComponent extends React.Component<Props> {
 
 ---
 
-##### In parent component
+##### 親コンポーネント
 
-Use union type to merge type definitions.
+* 型合成を使って伝搬する `propTypes` の定義を楽にする。
 
 ```jsx
 export type Props = ChildProps & {
@@ -483,7 +584,7 @@ export default class ParentComponent extends React.Component<Props> {
 
 ---
 
-#### Define the type of action
+#### アクション
 
 ```javascript
 type FetchAction = {
@@ -503,7 +604,9 @@ export type Action = FetchAction | FetchSuccessAction;
 
 ---
 
-### Define the type of reducer
+### Reducer
+
+* `payload` を使う場合はアクションが判明した時点でキャストする。 
 
 ```javascript
 const reducer = (state = initialState, action: Action) => {
@@ -511,7 +614,7 @@ const reducer = (state = initialState, action: Action) => {
     case 'FETCH_SUCCESS_ACTION':
       return {
         ...state,
-        entity: (action:FetchSuccessAction).payload,
+        entity: (action: FetchSuccessAction).payload,
       };
 
     default:
@@ -519,3 +622,23 @@ const reducer = (state = initialState, action: Action) => {
   }
 }
 ```
+
+---
+
+## まとめ
+
+---
+
+### React は素晴らしい
+
+---
+
+### んが
+
+---
+
+### フロントエンドはつらいよ
+
+---
+
+## Thank you for listening!
