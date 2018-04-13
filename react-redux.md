@@ -485,11 +485,17 @@ const mapStateToProps = (state) => ({
 });
 ```
 
+---
+
 ### アクションが Reduce されたときに別のアクションを Dispatch したい
+
+---
 
 #### 例
 
 リストでアイテムを選択した時に詳細を表示したい。 (詳細を取得するAPIにリクエストしたい)
+
+---
 
 #### 諦めるという選択肢
 
@@ -502,6 +508,8 @@ const selectItemAndFetchDetailsDispatcher = (targetId) => (dispatch) => {
   dispatch(fetchDetailsDispatcher(targetId));
 };
 ```
+
+---
 
 #### 自作ミドルウェアという選択肢
 
@@ -517,6 +525,8 @@ const fetchDetailsOnSelectItemMiddleware = ({ dispatch }) => (next) => (action) 
 };
 
 ```
+
+---
 
 ### その他
 
