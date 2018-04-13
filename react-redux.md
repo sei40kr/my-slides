@@ -499,7 +499,7 @@ const mapStateToProps = (state) => ({
 ```jsx
 const selectItemAndFetchDetailsDispatcher = (targetId) => (dispatch) => {
   dispatch(selectItem(targetId));
-  dispatch(fetchDetailsDispatcher());
+  dispatch(fetchDetailsDispatcher(targetId));
 };
 ```
 
