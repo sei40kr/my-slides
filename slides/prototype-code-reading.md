@@ -4,20 +4,21 @@
 
 ## 自己紹介
 
-よんじゅ (Twitter: [@sei40kr_sub](https://twitter.com/sei40kr_sub))
+よんじゅ
 
-- Arch Linux と Emacs と Z-shell が好き
-- 最近 Spacemacs から Doom Emacs に乗り換えた
-- 9 歳のとき (2002年) に JavaScript を初めて触る
+* Arch Linux と Emacs と Z-shell が好きなフリーランスエンジニア
+* 最近 Spacemacs から Doom Emacs に乗り換えた
+* 9 歳のとき (2002年) に JavaScript を初めて触る
+* Twitter: [@sei40kr_sub](https://twitter.com/sei40kr_sub)
 
 ---
 
 ## Prototype.js
 
-- **Prototype JavaScript framework: a foundation for ambitious web user interfaces**
+* **Prototype JavaScript framework: a foundation for ambitious web user interfaces**
   http://prototypejs.org
-- JavaScript のフルスタックライブラリ (Yahoo UI や Closure Library に網羅範囲は劣るが...)
-- 最終更新日は 2015/09/22
+* JavaScript のフルスタックライブラリ (Yahoo UI や Closure Library に網羅範囲は劣るが...)
+* 最終更新日は 2015/09/22
 
 ---
 
@@ -48,7 +49,7 @@
 
 ---
 
-## prototype
+## `prototype`
 
 * **コンストラクタ**のプロパティ
 * そのコンストラクタによって生成されたインスタンスに対して存在しないプロパティを参照したとき、代わりに `prototype` に定義されているプロパティが参照される
@@ -67,7 +68,21 @@ Class.prototype.foo;    // 'foo'
 
 ---
 
-## Object.getInstanceOf, \_\_proto\_\_
+## `prototype.constructor`
+
+* 何も指定しなければコンストラクタ自身が代入されている
+* 上書きすることもできる
+  ```js
+  Class.prototype.constructor = Object;
+  ```
+* ただし `instanceof` は欺けない
+  ```js
+  instance instanceof Class;    // true
+  ```
+
+---
+
+## `Object.getInstanceOf`, `__proto__`
 
 * 途中からインスタンス側からも `Object.getPrototypeOf` で参照できるようになった
 * ちなみに `__proto__` は非推奨だが、このスライドでは説明の便宜上使う。
@@ -82,13 +97,14 @@ instance.__proto__ === Class.prototype;                 // true
 
 ---
 
-## すべての道は Object に通ず
+## すべての道は `Object.prototype` に通ず
 
-* `prototype` 自体は `Object` で定義されることが多い
 * `Class` インスタンス `instance` のプロパティ `prop` を参照すると次の順に参照される
   * `instance.prop`
   * `instance.__proto__.prop`
   * **`instance.__proto__.__proto__.prop`**
+* `prototype` 自体はほぼ全て `Object` なので、最終的には `Object.prototype` にたどり着く。
+* ただし `Object.prototype.__proto__` は `null` であるため、循環参照は行われない。
 
 ```js
 function Class() {}
@@ -98,25 +114,11 @@ var instance = new Class();
 instance.prop;    // 'foo'
 ```
 
-* Prototype.js ではこの性質を利用しクラス継承の仕組みを実装する
-
 ---
 
-## prototype.constructor について
+## すべての道は `Object.prototype` に通ず
 
-- 何も指定しなければコンストラクタ自身が代入されている
-- 上書きすることもできる
-```js
-Class.prototype.constructor = Object;
-```
-- ただし `instanceof` は欺けない
-```js
-instance instanceof Class;    // true
-```
-
----
-
-## Vanilla JS でのクラス継承
+* この性質を利用しクラス継承の仕組みを実装することができる
 
 ```js
 function ParentClass() {}
@@ -145,7 +147,7 @@ Object.setPrototypeOf(ChildClass.prototype, ParentClass.prototype);
   
 ---
 
-## prototype 定義の弊害
+## Prototype 拡張の弊害
 
 ```js
 var array = [0, 1, 2];
@@ -159,7 +161,7 @@ for (var key in array) {
   
 ---
 
-## prototype 定義の弊害
+## Prototype 拡張の弊害
 
 `.hasOwnProperty` を使おう! (というか Array を for-in で回すのをやめよう)
 
@@ -173,10 +175,18 @@ for (var key in array) {
 
 ---
 
-## Don't Enum 属性
+## `DONT_ENUM` 属性
 
-- よくよく考えると built-in のメソッドは for-in しても列挙されない
-- この定義されているのに列挙されない属性を **Don't Enum 属性** と呼ぶ
+* よくよく考えると built-in のメソッドは for-in しても列挙されない
+* built-in のプロパティには for-in でも列挙されない属性 `DONT_ENUM` が付与されている
+
+V8 JavaScript Engine の `src/property-details.h`
+
+```c
+enum PropertyAttributes {
+  DONT_ENUM = ::v8::DontEnum,
+};
+```
 
 ---
 
@@ -184,7 +194,7 @@ for (var key in array) {
 
 ---
 
-## Class.create  の仕様
+## `Class.create` の仕様
 
 * クラスメソッドを定義したオブジェクトを引数として渡す
 * `initialize` はコンストラクタとして扱われる
@@ -204,7 +214,7 @@ var Animal = Class.create({
 
 ---
 
-## Class.create の仕様
+## `Class.create` の仕様
 
 * 第一引数に別のクラスを渡すことによってそのクラスを親とする子クラスを生成できる
 * メソッドの第一引数の名前を `$super` にすると、それをスーパーメソッドとして扱える。
@@ -225,18 +235,17 @@ ringneck.speak();
 
 ---
 
-## Class.create
+## `Class.create`
 
-1. 第一引数が Function であればそれを親クラスとみなす。他は定義するメソッドとみなす。
+1) 第一引数が Function であればそれを親クラスとみなす。他は定義するメソッドとみなす。
    ```js
    var parent = null, properties = $A(arguments);
 
-     をもったオブジェクト
    if (Object.isFunction(properties[0]))
      parent = properties.shift();
    ```
 
-1. コンストラクタでは単純に initialize を呼び出す
+1) コンストラクタでは単純に initialize を呼び出す
    ```js
    function klass() {
      this.initialize.apply(this, arguments);
@@ -245,13 +254,13 @@ ringneck.speak();
    
 ---
 
-## Class.create
+## `Class.create`
 
-1. コンストラクタに対してメソッドを追加する。これにより addMethods() が追加される。
+1) コンストラクタに対してメソッドを追加する。これにより addMethods() が追加される。
    ```js
    Object.extend(klass, Class.Methods);
    ```
-1. コンストラクタにクラスのメタデータを格納
+1) コンストラクタにクラスのメタデータを格納
    ```js
    klass.superclass = parent;
    klass.subclasses = [];
@@ -259,7 +268,7 @@ ringneck.speak();
 
 ---
 
-## Class.create
+## `Class.create`
 
 prototype の prototype を親クラスの prototype にする
 
@@ -281,7 +290,7 @@ klass.prototype.__proto__ = parent.prototype;
 
 ---
 
-## Class.create
+## `Class.create`
 
 クラスメソッドを追加する
 
@@ -292,9 +301,9 @@ for (var i = 0, length = properties.length; i < length; i++)
 
 ---
 
-## Class.Methods.addMethods
+## `Class.Methods.addMethods`
 
-既に Don't Enum 属性が付与されている built-in プロパティと同名のプロパティを定義したときに for-in で列挙されないバグに対する workaround
+既に `DONT_ENUM` 属性が付与されている built-in プロパティと同名のプロパティを定義したときに for-in で列挙されないバグに対する workaround
 
 ```js
 var IS_DONTENUM_BUGGY = (function(){
@@ -316,7 +325,7 @@ if (IS_DONTENUM_BUGGY) {
 
 ---
 
-## Class.Methods.addMethods
+## `Class.Methods.addMethods`
 
 ```js
 ancestor && Object.isFunction(value) && value.argumentNames()[0] == "$super"
@@ -324,7 +333,7 @@ ancestor && Object.isFunction(value) && value.argumentNames()[0] == "$super"
 
 ---
 
-## Function.prototype.toString
+## `Function.prototype.toString`
 
 Function を `toString()` するとソースコードが文字列で返る
 
@@ -342,7 +351,7 @@ $$.toString();        // 'function() { [Command Line API] }'
 
 ---
 
-## Function.prototype.argumentNames
+## `Function.prototype.argumentNames`
 
 これを利用して引数を格納する変数名を正規表現で取得する (マジか)
 
@@ -357,10 +366,10 @@ function argumentNames() {
 
 ---
 
-## Class.Methods.addMethods
+## `Class.Methods.addMethods`
 
 * `Function.prototype.wrap` は引数の先頭から分割代入を行うための独自メソッド (ここでは第一引数に `$super` を分割代入)
-* 即時関数を使ってメソッドを再定義しているのはなぜだろう
+* 親クラスのメソッドをラップした関数を即時関数で返しているのはなぜだろう
 
 ```js
 var method = value;
@@ -371,7 +380,7 @@ value = (function(m) {
 
 ---
 
-## 変数のスコープ
+## 例: 変数のスコープ
 
 ```js
 var f = new Array(3);
@@ -388,7 +397,7 @@ f[0]();    // 0 ではなく 2 が返る
 
 ---
 
-## 変数のスコープ
+## 例: 変数のスコープ
 
 * 各ループがスコープを共有しているのが問題
 * ならば**各ループの中で新しいスコープを作ってその時点での値をコピー**すればいい
@@ -407,7 +416,7 @@ f[0]();    // 0
 
 ---
 
-## Class.Methods.addMethods
+## `Class.Methods.addMethods`
 
 最後に `toString()` したときにラップする前の関数のソースコードを返すようにする (細かい...)
 
@@ -423,9 +432,17 @@ value.toString = (function(method) {
 
 ---
 
+## 他に読んでほしい箇所
+
+* `Element`
+* `Element.extend`
+* `Array.prototype.each`
+
+---
+
 ## まとめ
 
-* JavaScript なんもわからん...
+* JavaScript なにもわかりません!
 
 ---
 
