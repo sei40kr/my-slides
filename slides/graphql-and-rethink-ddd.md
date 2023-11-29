@@ -343,6 +343,10 @@ Result<User>.failure(Error("User not found"))
 GraphQLスキーマにはジェネリクス型がないため、型引数ごとに型が定義される。
 
 ```graphql
+type Error {
+  message: String!
+}
+
 type UserResult {
   value: User
   error: Error
@@ -474,9 +478,7 @@ data class UserWithProfileAndPosts(val user: User, val profile: Profile, val pos
 |テーブル結合を行わずに取得しなかったフィールドを `null` とする|○|◎|✗|
 |CQRSによる読み込み系/更新系でモデルの分離|✗|◎|○|
 
-## 抽象化とパフォーマンスはしばしば対立する
-
-DDDは単なる実装パターンの集合体でない。
+## 抽象化とパフォーマンスはしばしばトレードオフ
 
 ## Data Loader
 
