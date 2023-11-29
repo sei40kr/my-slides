@@ -18,11 +18,8 @@
 data class User(
   val id: Int,
   val name: String,
-) {
-  suspend fun posts(): List<Post> {
-    // ...
-  }
-}
+  val posts: List<Post>,
+)
 
 data class Post(
   val id: Int,
@@ -45,7 +42,22 @@ type Post {
 }
 ```
 
+## GraphQLクエリResolverの実装例
+
+```kotlin
+class UserQueryResolver(private val findUserByIdUsecase: FindUserByIdUsecase) {
+  fun user(id: ID): User? {
+    val request = FindUserByIdUsecase.Request(id = id.toDomainId())
+
+    return findUserByIdUsecase.execute(request)
+  }
+}
+```
+
 ## GraphQLクエリの例
+
+ここでは取得するユーザーのIDを指定していない。
+`$id` はSQLのプレースホルダー `?` のようなもので、実行時に値を埋め込む。
 
 ```graphql
 query {
@@ -64,8 +76,7 @@ query {
 
 ## GraphQLリクエストの例
 
-ここでは取得するユーザーのIDを指定していない。
-`$id` はSQLのプレースホルダー `?` のようなもので、実行時に値を埋め込む。
+クエリとは別に `$id` に渡す値を指定している。
 
 ```json
 {
@@ -101,27 +112,26 @@ query {
 
 ## GraphQLのメリット
 
-- 静的型付け言語である
+- **静的型付け言語である。**
   - スキーマ**とクエリ**からTypeScriptの型定義を生成できるため、BEとFEが静的型付け言語であればBEからFEまで型安全に開発できる。
   - BEで定義したモデルからスキーマを生成し、スキーマとクエリからFEの型定義を生成するのが一般的。
-- 単一のHTTPリクエストで複数のクエリをバッチ実行できるため、HTTPリクエスト生成のオーバーヘッドを抑えられる。
-- クエリごとに取得するフィールドを指定でき、over fetchingを防げる。
+- 単一のHTTPリクエストで**複数のクエリをバッチ実行できる**ため、HTTPリクエスト生成のオーバーヘッドを抑えられる。
+- クエリごとに取得するフィールドを指定でき、**オーバーフェッチを防げる。**
 - クエリをネストすることができる。(後述)
-- スキーマにドキュメントを記述できる。
-  - REST API+Swaggerのように別のドキュメントツールを併用しなくてよい。
+- スキーマにドキュメントを記述できる。Swaggerのようにドキュメントツールを併用しなくてよい。
 
 ## GraphQLのメリット
 
 - Subscriptionを使ってBEとFE間で双方向通信ができる。(詳しくないので割愛)
-- LSP準拠のGraphQL PlaygroundやGraphQL言語サーバーなど、開発環境が充実している。
-- Data Loader (後述)
+- Tree-sitterパーサーやGraphQL Playground, LSP準拠のGraphQL言語サーバーなど、**開発環境が充実している。**
+- **Data Loader** (後述)
 
 ## GraphQLのデメリット
 
 - 一般的にGraphQLはWeb APIより通信量が多くなりがちである。
   - なぜならGraphQLがWeb APIの上に構築されるため。
   - APQ (Advanced Persistent Queries) というRPC機能で解決できるが、GraphQLではなくFW依存の機能である。
-- 単一のHTTPリクエストで複数のクエリをバッチ実行できてしまうため、バックエンド負荷の制御が難しい。
+- 単一のHTTPリクエストで複数のクエリをバッチ実行できてしまうため、**BE負荷の制御が難しい。**
   - REST APIでは1リクエスト毎に1クエリであるため、L3でもリクエストレートを制限することで負荷を抑えることができる。
   - GraphQLではリクエストボディに含まれるクエリを解析しなければ負荷量が分からないため、L7で負荷を制御する必要がある。(後述)
 
@@ -211,7 +221,6 @@ query {
 
 GraphQLはクエリをネストすることができる。
 
-
 ```kotlin
 data class User(
   val id: ID,
@@ -240,30 +249,7 @@ query {
 
 ## クエリのネスト
 
-```json
-{
-  "data": {
-    "user": {
-      "id": 1,
-      "name": "John",
-      "posts": [
-        {
-          "id": 1,
-          "message": "Hello, world!"
-        },
-        {
-          "id": 2,
-          "message": "Goodbye, world!"
-        }
-      ]
-    }
-  }
-}
-```
-
-## クエリのネスト
-
-GraphQLの構造体型が同じ型をフィールドにもつと、クエリを無限にネストできてしまうため、`curl` などで直接GraphQLエンドポイントに深いネストを含むクエリを送信することで、クライアントは高負荷のHTTPリクエストを作成できてしまう。
+GraphQLの構造体型が同じ型をフィールドにもつとクエリを無限にネストできる。
 
 ```graphql
 type Post {
@@ -274,6 +260,8 @@ type Post {
 ```
 
 ## クエリのネスト
+
+`curl` などで直接GraphQLエンドポイントに深いネストを含むクエリを送信することで、クライアントは高負荷のHTTPリクエストを作成できてしまう。
 
 ```graphql
 query {
@@ -328,9 +316,9 @@ query {
 
 ## エラー処理
 
-- 静的型でHaskellの `Either`, あるいはRustの `Result` のような型を実装して使うのがよい。
+- 静的型でHaskellの `Either`, あるいはRustの `Result` のようなtyped errorを実装して使うのがよい。
   - ただし、GraphQLスキーマにUnion型はないため、投げうるドメイン例外全てを型で列挙するのは非常に面倒。
-  - 最低限 `Either` or `Result` を戻り値としておけば、無意識にドメイン例外が捨てられる事態を軽減できる (はず)。
+  - 最低限typed errorを戻り値としておけば、無意識にドメイン例外が捨てられる事態を軽減できる (はず)。
 
 ## エラー処理
 
@@ -402,6 +390,7 @@ type UserResult {
 
 ### BEでモデルを結合
 
+- one to manyで結合する場合はほぼBEでモデルを結合することになる。
 - 実装するとすればドメイン層 or ユースケース層
   - ドメイン操作に関係のない、ただプレゼンテーション層に流したいだけのデータの結合処理がドメイン層 or ユースケース層に入り込むことになり冗長に。
   - あるいは取得〜結合までをやってくれる `Service` が乱立し、モデルベースから遠ざかってゆく。
@@ -426,8 +415,7 @@ data class Profile(
 
 ```kotlin
 val users = userRepository.findByIds(userIds)
-val profileByUserId = profileRepository.findByUserIds(userIds)
-  .associateBy { it.userId }
+val profileByUserId = profileRepository.findByUserIds(userIds).associateBy { it.userId }
 
 users.map { user ->
   // ハッシュマップからの取得は O(1) の償却コストで行える
@@ -461,21 +449,20 @@ data class UserWithProfileAndPosts(val user: User, val profile: Profile, val pos
 ### 全ての結合パターンに対応できるエンティティクラスを定義する
 
 1. 常に全てのテーブル結合を行う。
-    - 最もモデルベースに近い。
     - ユースケースに依らず全てのテーブル結合を行うため、パフォーマンスは最悪。
     - `Repository` の更新系メソッドを呼び出すときには全てのテーブルを更新する必要がある。
         - 読み込み系と更新系でモデルを分ける方法 (CQRS) もあるが、銀の弾丸ではない。(後述)
 1. テーブル結合を行わずに取得しなかったフィールドを `null` とする
-    - 論理設計レベルで `nullable` であるフィールドと区別しにくい。
+    - 論理設計レベルでnullableであるフィールドと区別しにくい。
     - 静的なnull安全でないため、使う側のコードで `null` チェックやエラー処理などの防御的プログラミングが必要になり、コードが冗長に。
 
 ### CQRSによる読み込み系/更新系でモデルの分離
 
-- そもそも `Command` はモデルベースであることを犠牲にしている。
+- 参照系/更新系でモデルを分離するのはモデルベースであることを犠牲にしている。
   - もっとも、モデルベースで実装することが現実的に難しい処理は確実に存在する。
-  例: モデルベースでユーザーIDの重複チェックを実装するために全ユーザーをDBからフェッチするのか、など。
+    - 例: モデルベースでユーザーIDの重複チェックを実装するために全ユーザーをDBからフェッチするのか、など。
   - CQRSはモデルベースでの実装が難しい箇所に限定して使うのがよい。
-  CQRSパターンを採用したからと言って、全ての実装がCQRSである必要は全くない。
+  - CQRSパターンを採用したからと言って、全ての実装がCQRSである必要は全くない。
 
 ### 取得方法の比較
 
@@ -487,17 +474,23 @@ data class UserWithProfileAndPosts(val user: User, val profile: Profile, val pos
 |テーブル結合を行わずに取得しなかったフィールドを `null` とする|○|◎|✗|
 |CQRSによる読み込み系/更新系でモデルの分離|✗|◎|○|
 
+## 抽象化とパフォーマンスはしばしば対立する
+
+DDDは単なる実装パターンの集合体でない。
+
 ## Data Loader
 
-- BEの**プレゼンテーション層**でデータを結合するための機能
-  - Data LoaderはCQRSにおけるQuery Modelをプレゼンテーション層に書くためのフレームワークと言える。
+- BEの**プレゼンテーション層**でデータを結合するためのGraphQLの機能
+  - Data LoaderはCQRSにおけるQueryモデルをプレゼンテーション層に書くためのフレームワークと言える。
 - スケジューラーによる**遅延バッチ処理**と**並列処理**
   - 遅延バッチ処理によりN+1を意識せずに直感的に書ける。
   - 並列処理によりレスポンスタイムの劣化を最小限に抑える。
-- GraphQLはスキーマと**クエリ**ごとにFEの型定義を生成できる
-  - テーブル結合ごとにエンティティクラスを定義する必要がない。
-  - テーブル結合を行わずに取得しなかったフィールドを `null` とする必要がない。
-    - BEのモデルを汚染することなくFEで静的なnull安全が手に入る。
+
+## Data Loader
+
+- プレゼンテーション層から呼び出せるため、ビュー都合でドメイン層を汚染しない。
+- FEが必要としないデータはフィールドを省けばData Loaderは実行されない。
+  - FEの型定義はスキーマ**とクエリ**から生成されるため、静的なnull安全が手に入る。
 
 ### Data Loaderを呼び出すフィールドの実装例
 
@@ -514,9 +507,8 @@ data class User(
 
 ### Data Loaderの実装例
 
-- `User#posts` では単一のユーザーIDをData Loaderに渡しているのに対し、Data Loaderは複数のユーザーIDを処理しているのに注目
-  - Data Loaderのスケジューラーが遅延バッチ処理により複数のユーザーIDをまとめて処理しているため。
-  これによりN+1を意識せずに直感的に書ける。
+- `User#posts` では単一のユーザーIDをData Loaderに渡しているのに対し、Data Loaderは複数のユーザーIDを処理しているのに注目。
+  - Data Loaderのスケジューラーが遅延バッチ処理により複数のユーザーIDをまとめて処理しているため。これによりN+1を意識せずに直感的に書ける。
   - そのため、IDからエンティティの取得を行う `Repository` はバッチ取得に対応させておくのがおすすめ。
 
 ```kotlin
@@ -541,11 +533,11 @@ class PostsByUserIdDataLoader(private val postRepository: PostRepository) : Kotl
 data class User(
   // ...
 ) {
-  fun posts(dfe): CompletableFuture<List<Post>> {
+  fun posts(dfe: DataFetchEnvironment): CompletableFuture<List<Post>> {
     return dfe.getValueFromDataLoader("PostsByUserIdDataLoader", id)
   }
 
-  fun postCount(dfe): CompletableFuture<Int> {
+  fun postCount(dfe: DataFetchEnvironment): CompletableFuture<Int> {
     return posts.thenApply { it.size }
   }
 }
@@ -553,14 +545,14 @@ data class User(
 
 ### Data Loaderもまた銀の弾丸ではない
 
-- プレゼンテーション層でデータを結合するため、ドメインロジックでも参照したい場合は使えない。
+- プレゼンテーション層でデータを結合するため、ドメインロジックでも結合データを参照したい場合は使えない。
 - 結局BE側でデータを結合していることに変わりはないため、SQLのテーブル結合のパフォーマンスには及ばない。(と予測)
 
 ## Data Loaderを使う条件まとめ
 
 以下の条件を全て満たす場合はData Loaderを使うのがよい。
 
-- 結合したいデータはユースケースに依っては結合しないこともある。
+- 結合したいデータはユースケースに依っては結合が不要である。
 - 結合したいデータはドメインロジックで参照されない。
 
 ## 次回予告
