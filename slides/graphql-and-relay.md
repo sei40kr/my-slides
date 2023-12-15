@@ -4,11 +4,240 @@
 
 # Relay
 
-- Facebookが開発したGraphQLのフレームワーク
+- Facebookが開発したGraphQLのフレームワークの1つ。
+- Reactとの相性が良い。
+- IDにより正規化されたフラットなデータキャッシュをglobal stateとしてもつ。
+- GraphQLクエリをFragmentという単位で管理し、クエリの再利用性を高める。
+- GraphQLミューテーションの楽観レスポンス (後述) によるUIの更新をサポートする。
 
-# Relayのメリット
+# 補足: FEのステート管理
 
-<!-- TODO: 書く -->
+- FEのステート管理は昔はFluxやReduxなどが主流だった。
+- モダンなFEではAPIやGraphQLのレスポンスキャッシュをそのままglobal stateとして扱い、それ以外はcomponent stateを使うことが多い。
+  - global stateはアプリケーションと同じライフサイクルをもつ。
+  - component stateは必然的にコンポーネントと同じライフサイクルをもつ。
+  - component stateはコンポーネントのライフサイクルによってステートを更新する。global stateはステートによってコンポーネントのライフサイクルを司る。
+
+# 補足: FEのステート管理
+
+- global stateをマメに設計せずに、APIやGraphQLのレスポンスキャッシュをそのままglobal stateとして扱うのが主流ぽい。
+  - SWR, Apollo Clientなどのライブラリはこの考え方を採用している。
+- Relayも似たような考え方だが、レスポンスに含まれるデータをIDによって正規化されたフラットな構造に変換して保持する点が異なる。
+
+# 補足: Fragment
+
+Fragment自体はGraphQLの機能の1つである。フィールドの集合を定義することでクエリの再利用性を高める。
+
+# 補足: Fragment
+
+```graphql
+type User {
+  id: ID!
+  name: String!
+  email: String!
+}
+```
+
+# 補足: Fragment
+
+```graphql
+fragment UserFragment on User {
+  name
+  email
+}
+```
+
+# 補足: Fragment
+
+```graphql
+query {
+  user(id: $id) {
+    id
+    # nameとemailフィールドを展開する
+    ...UserFragment
+  }
+}
+```
+
+# 補足: Fragment
+
+```graphql
+mutation {
+  updateUser(input: $input) {
+    user {
+      id
+      # nameとemailフィールドを展開する
+      ...UserFragment
+    }
+  }
+}
+```
+
+# 例: GraphQLクエリをFragmentという単位で管理し、クエリの再利用性を高める
+
+`createFragmentContainer` を使うことでFragmentをReactコンポーネントに紐付けることができる。
+そのコンポーネントが描画されるとき、紐付けられたFragmentがGraphQLクエリとして実行され、そのレスポンスがコンポーネントのpropsとして渡される。
+
+# 例: GraphQLクエリをFragmentという単位で管理し、クエリの再利用性を高める
+
+```typescript
+interface UserDetailProps {
+  id: string;
+  name: string;
+  email: string;
+}
+
+const UserDetail = (props: UserDetailProps) => {
+  // 省略
+};
+```
+
+# 例: GraphQLクエリをFragmentという単位で管理し、クエリの再利用性を高める
+
+```typescript
+import { graphql, createFragmentContainer } from "react-relay";
+
+createFragmentContainer(
+  UserDetail,
+  graphql`
+    fragment UserDetail_user on User {
+      id
+      name
+      email
+    }
+  `
+)
+```
+
+# 例: GraphQLクエリをFragmentという単位で管理し、クエリの再利用性を高める
+
+ユーザー詳細を描画する `UserDetail` コンポーネントからは `User` オブジェクトの `id` と `name` と `email` をクエリしたいとする。
+
+```graphql
+fragment UserDetail_user on User {
+  id
+  name
+  email
+}
+```
+
+# 例: GraphQLクエリをFragmentという単位で管理し、クエリの再利用性を高める
+
+ユーザー一覧を描画する `UserList` コンポーネントからは `User` オブジェクトの `id` と `name` フィールドと `UserDetail` で使われるフィールド群をクエリしたいとする。
+
+```graphql
+fragment UserList_user on User {
+  id
+  name
+  # このように `UserDetail` で使われるFragmentを再利用できる
+  ...UserDetail_user
+}
+```
+
+# 例: GraphQLクエリをFragmentという単位で管理し、クエリの再利用性を高める
+
+ユーザー一覧 `UserList` コンポーネントからあるユーザーを選択し、そのユーザーの詳細を `UserDetail` で開くとする。
+
+この場合、`UserDetail` のFragmentはクエリされず、必要なデータがキャッシュから取得される。
+異なるFragmentであるにも関わらず同じキャッシュを使い回せるのは、キャッシュ構造が正規化されている恩恵である。
+
+# 例: GraphQLミューテーションの楽観レスポンスによるUIの更新
+
+ユーザーリスト画面からユーザーの情報を編集するミューテーションを考える。
+
+```graphql
+mutation {
+  updateUser(input: $input) {
+    user {
+      id
+      name
+      email
+    }
+  }
+}
+```
+
+# 例: GraphQLミューテーションの楽観レスポンスによるUIの更新
+
+本来であれば、更新内容をUI上に反映するために
+
+- GraphQLミューテーションの入力でキャッシュを差分更新する
+- GraphQLミューテーションのレスポンスに最新の `User` オブジェクトを含め、その内容でキャッシュを差分更新する
+- ユーザーリストをリフェッチし、キャッシュを更新する
+
+のいずれかを明示的に行う必要があった。
+
+# GraphQLミューテーションの入力でキャッシュを差分更新する
+
+この実装では、GraphQLミューテーションの完了を待つ必要がないため、ユーザーの操作に対して即座にUIを更新できる。
+その反面、更新されていないユーザーのキャッシュのフィールドはデータが最新でない可能性がある。
+
+# GraphQLミューテーションのレスポンスに最新の `User` オブジェクトを含め、その内容でキャッシュを差分更新する
+
+この実装では、更新した `User` のキャッシュの全てのフィールドが最新のデータであることを保証できる。
+その反面、GraphQLミューテーションの完了を待つ必要があるため、ユーザーの操作に対して即座にUIを更新できない。
+
+# 楽観レスポンス
+
+RelayはReactの宣言的レンダリングを活かし、2段階でUIを更新する。
+
+1. ユーザーの操作に対して即座にGraphQLミューテーションの入力でキャッシュを差分更新する。
+1. GraphQLミューテーションの完了を待って、GraphQLミューテーションのレスポンスで更新された `User` のキャッシュを最新の状態に更新する。
+
+# 例: GraphQLミューテーションの楽観レスポンスによるUIの更新
+
+```typescript
+import { graphql } from "react-relay";
+
+const mutation = graphql`
+  mutation UpdateUserMutation($input: UpdateUserInput!) {
+    # 省略
+  }
+`;
+```
+
+# 例: GraphQLミューテーションの楽観レスポンスによるUIの更新
+
+```typescript
+import { commitMutation } from "react-relay";
+
+commitMutation(environment, {
+  mutation,
+  variables: {
+    input: {
+      id: user.id,
+      name: name,
+      email: email,
+    },
+  },
+  // ここで擬似的なレスポンス (楽観レスポンス) を指定する
+  optimisticResponse: getOptimisticResponse(name, email, user),
+})
+```
+
+# 例: GraphQLミューテーションの楽観レスポンスによるUIの更新
+
+```typescript
+const getOptimisticResponse = (
+  name: string,
+  email: string,
+  user: User
+): UpdateUserMutationResponse => ({
+  updateUser: {
+    user: {
+      id: user.id,
+      name: name,
+      email: email,
+    },
+  },
+});
+```
+
+# Relayのサーバー仕様
+
+これらの恩恵を受けるには、RelayのGraphQLサーバー仕様 (GraphQL Server Specification) に対してGraphQLスキーマやクエリ, ミューテーションが準拠する必要がある。
+
+# RelayのGraphQLサーバー仕様
 
 # Global Object Identification
 
@@ -214,8 +443,8 @@ SELECT * FROM users WHERE id > ? ORDER BY id LIMIT 10
 
 # シーク法
 
-- ソートカラムの組み合わせは候補キー (テーブル内でレコードを一意に特定できるカラムの組み合わせ) である必要がある。
-  - テーブル内の行に一意のキーが割り当てられている場合、そのキーをソートカラムの最後に含めておけばよい。
+- ソートカラムの組み合わせはスーパーキー (テーブル内でタプル (行) を一意に特定できるカラムの組み合わせ) である必要がある。
+  - テーブルの各タプルに既に一意のキーが割り当てられている場合、そのキーをソートカラムの最後に含めておけばよい。
 - ページの最初と最後のデータのソートカラムの値をクライアント側で保持しておく必要がある。
 
 # オフセット法 vs シーク法
@@ -227,7 +456,7 @@ https://www.slideshare.net/MarkusWinand/p2d2-pagination-done-the-postgresql-way
 
 Relayでは、シーク法ページングにConnectionというGraphQLクエリインターフェイスを用いるよう推奨されている。
 
-| 引数 | 説明 |
+| 入力 | 説明 |
 | --- | --- |
 | `first` | (検索方向が正順の場合) 取得する件数 |
 | `after` | ページングの開始位置 |
@@ -342,6 +571,12 @@ Cursorにはソートカラムの値を含めておくのがおすすめ。
 
 # Cursor
 
+Cursorにはどのエンティティかの情報を含ませておくのがおすすめ。
+
+エンティティごとにCursorの実装クラスを定義してプレゼンテーション層でキャストすることで、ドメイン層以上は型安全を保つことができる。
+
+# Cursor
+
 例えば、User (ユーザー) を**名前の昇順 → IDの昇順**でソートするケースを考える。
 
 ```json
@@ -360,7 +595,7 @@ Cursorにはソートカラムの値を含めておくのがおすすめ。
 ```json
 {
   "id": 1,
-  "name": "Alice",
+  "name": "Alice"
 }
 ```
 
